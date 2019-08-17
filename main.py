@@ -2,16 +2,13 @@ import board
 import random
 import neopixel
 import time
-from touchio import TouchIn
 from math import floor
 from digitalio import DigitalInOut, Direction, Pull
-
 
 numpix = 54
 strip = neopixel.NeoPixel(board.D1, numpix, brightness=1, auto_write=False)
 
 blue = (0,0,5)
-green = (0,5,0)
 red = (5,0,0)
 white = (5,5,5)
 black = (0,0,0)
@@ -24,7 +21,7 @@ def clear():
     set_all((0,0,0))
 
 def rand_color():
-    return tuple(sorted((0, 0xFF, random.randrange(0,5)), key = lambda x: random.random()))
+    return tuple(sorted((0, 64, random.randrange(0,5)), key = lambda x: random.random()))
 
 def rand_led():
     return random.randrange(0, numpix)
@@ -41,7 +38,6 @@ class ColorFlash():
             self.cycle_num = 0
         mult = (self.cycles_to_black - self.cycle_num) / self.cycles_to_black
         set_all(tuple([int(mult * x) for x in self.color]))
-        strip.write()
         self.cycle_num += 1
 
 # Random every time
@@ -49,29 +45,6 @@ class RandomJunk():
     def run(self):
         for i in range(numpix):
             strip[i] = rand_color()
-        strip.write()
-
-# Single pixels fall to the end and stack
-class Falling():
-    def __init__(self):
-        clear()
-        self.led_pos = 0
-        self.end = numpix
-        self.color = rand_color()
-
-    def run(self):
-        if (self.led_pos >= self.end):
-            self.led_pos = 0
-            self.end -= 1
-        strip[self.led_pos] = self.color
-        strip.write()
-        if self.led_pos < self.end - 1:
-            strip[self.led_pos] = (0,0,0)
-        self.led_pos += 1
-        if self.end == 0:
-            self.led_pos = 0
-            self.end = numpix
-            self.color = rand_color()
 
 # similar to Falling
 class FunFill():
@@ -87,8 +60,6 @@ class FunFill():
             self.i = 0
             self.color = rand_color()
 
-        strip.write()
-
 class Sparkle():
     def __init__(self):
         clear()
@@ -98,10 +69,9 @@ class Sparkle():
             strip[i] = black
         self.clear_list.clear()
         for i in range(numpix/3):
-            idx = random.randrange(0,numpix - 1)
+            idx = rand_led()
             strip[idx] = white
             self.clear_list.append(idx)
-        strip.write()
 
 class BWFade():
     def __init__(self):
@@ -120,7 +90,6 @@ class BWFade():
         for f in self.fades:
             strip[f[0]] = f[1]
             f[1] = (max(f[1][0] - f[2], 0), max(f[1][1] - f[2], 0), max(f[1][2] - f[2], 0))
-        strip.write()
         self.fades = list(filter(lambda f: f[1][2] > 0, self.fades))
 
 class RWTwinkle():
@@ -131,7 +100,6 @@ class RWTwinkle():
         self.offset += 1
         for i in range(numpix):
             strip[(i + self.offset) % numpix] = red if i % 2 == 0 else white
-        strip.write()
 
 class RWMarch():
     def __init__(self):
@@ -141,23 +109,49 @@ class RWMarch():
         self.offset += 1
         for i in range(numpix):
             strip[(i + self.offset) % numpix] = red if i % 4 <=1 else white
-        strip.write()
 
-modes = [RWMarch, RWTwinkle, BWFade, Sparkle, FunFill, Falling, RandomJunk, ColorFlash]
+class WhiteHead():
+    def __init__(self, level):
+        clear()
+        self.c = (level,level,level)
+    def run(self):
+        for i in range(12, 43):
+            strip[i] = self.c
+
+class RedHead():
+    def __init__(self):
+        clear()
+    def run(self):
+        blue = [13, 17, 21, 25, 29, 33, 37, 41]
+        for i in blue:
+            strip[i] = (0,255,0)
+
+HiLamp = lambda: WhiteHead(255)
+MedLamp = lambda: WhiteHead(64)
+LowLamp = lambda: WhiteHead(16)
+modes = [RWMarch, RWTwinkle, BWFade, Sparkle, FunFill, RandomJunk, ColorFlash, HiLamp, MedLamp, LowLamp, RedHead]
+
 num_modes = len(modes)
 mode_index = 0
 active_mode = modes[mode_index]()
 
-print(board)
 button = DigitalInOut(board.D0)
 button.direction = Direction.INPUT
 button.pull = Pull.DOWN
-last_button = button.value
+button_valid = True
 
 while True:
-    if (button.value and button.value != last_button):
-        print("changing")
-        mode_index = (mode_index + 1) % num_modes
-        active_mode = modes[mode_index]()
-    last_button = button.value
     active_mode.run()
+    strip.write()
+    sleep_time = 0
+    while sleep_time < .1:
+        time.sleep(.01)
+        sleep_time += .01
+        if (button.value and button_valid):
+            button_valid = False
+            print("changing")
+            mode_index = (mode_index + 1) % num_modes
+            active_mode = modes[mode_index]()
+            print(mode_index)
+        if (not button.value and not button_valid):
+            button_valid = True
