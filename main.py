@@ -21,7 +21,7 @@ def clear():
     set_all((0,0,0))
 
 def rand_color():
-    return tuple(sorted((0, 64, random.randrange(0,5)), key = lambda x: random.random()))
+    return tuple(sorted((0, 32, random.randrange(0,5)), key = lambda x: random.random()))
 
 def rand_led():
     return random.randrange(0, numpix)
