@@ -58,6 +58,7 @@ class FunFill():
         self.i += 1
         if (self.i >= numpix):
             self.i = 0
+            clear()
             self.color = rand_color()
 
 class Sparkle():
